@@ -1,0 +1,65 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "SmartDropUI (Blazor)",
+      "type": "coreclr",
+      "request": "launch",
+      "preLaunchTask": "Build Solution (Debug)",
+      "program": "dotnet",
+      "args": [
+        "run",
+        "--project",
+        "SmartDropUI/SmartDropUI.csproj",
+        "--no-build",
+        "--launch-profile",
+        "http"
+      ],
+      "cwd": "${workspaceFolder}",
+      "stopAtEntry": false,
+      "console": "integratedTerminal",
+      "env": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      }
+    },
+    {
+      "name": "RiegoAPI (Web API)",
+      "type": "coreclr",
+      "request": "launch",
+      "preLaunchTask": "Build Solution (Debug)",
+      "program": "dotnet",
+      "args": [
+        "run",
+        "--project",
+        "RiegoAPI/RiegoAPI.csproj",
+        "--no-build",
+        "--no-launch-profile"
+      ],
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "env": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      }
+    },
+    {
+      "name": "PROYECTO_FINAL (WinForms)",
+      "type": "clr",
+      "request": "launch",
+      "preLaunchTask": "Build Solution (Debug)",
+      "program": "${workspaceFolder}/PROYECTO_FINAL/bin/Debug/PROYECTO_FINAL.exe",
+      "args": [],
+      "cwd": "${workspaceFolder}/PROYECTO_FINAL/bin/Debug",
+      "console": "integratedTerminal"
+    }
+  ],
+  "compounds": [
+    {
+      "name": "SmartDropUI + RiegoAPI",
+      "configurations": [
+        "RiegoAPI (Web API)",
+        "SmartDropUI (Blazor)"
+      ],
+      "stopAll": true
+    }
+  ]
+}

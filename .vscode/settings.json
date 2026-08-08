@@ -1,0 +1,8 @@
+{
+  "dotnet.defaultSolution": "PROYECTO_FINAL.sln",
+  "files.exclude": {
+    "**/bin": true,
+    "**/obj": true,
+    ".vs": true
+  }
+}

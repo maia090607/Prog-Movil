@@ -55,7 +55,7 @@ namespace PROYECTO_RIEGO_AUTOMATICO
             {
                 try
                 {
-                    await MostrarDatosAsync(mensaje);
+                    await MostrarDatosAsync($"{mensaje.Humedad},{(mensaje.BombaEncendida ? 1 : 0)}");
 
                 }
                 catch (Exception ex)

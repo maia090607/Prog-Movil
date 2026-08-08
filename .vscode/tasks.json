@@ -1,0 +1,47 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Build Solution (Debug)",
+      "type": "process",
+      "command": "${env:ProgramFiles}\\Microsoft Visual Studio\\18\\Community\\MSBuild\\Current\\Bin\\MSBuild.exe",
+      "args": [
+        "PROYECTO_FINAL.sln",
+        "/m",
+        "/p:Configuration=Debug",
+        "/nologo",
+        "/verbosity:minimal"
+      ],
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      },
+      "problemMatcher": "$msCompile"
+    },
+    {
+      "label": "Build Solution (Release)",
+      "type": "process",
+      "command": "${env:ProgramFiles}\\Microsoft Visual Studio\\18\\Community\\MSBuild\\Current\\Bin\\MSBuild.exe",
+      "args": [
+        "PROYECTO_FINAL.sln",
+        "/m",
+        "/p:Configuration=Release",
+        "/nologo",
+        "/verbosity:minimal"
+      ],
+      "problemMatcher": "$msCompile"
+    },
+    {
+      "label": "Restore NuGet (Solution)",
+      "type": "process",
+      "command": "${env:ProgramFiles}\\Microsoft Visual Studio\\18\\Community\\MSBuild\\Current\\Bin\\MSBuild.exe",
+      "args": [
+        "PROYECTO_FINAL.sln",
+        "/t:Restore",
+        "/nologo",
+        "/verbosity:minimal"
+      ],
+      "problemMatcher": []
+    }
+  ]
+}

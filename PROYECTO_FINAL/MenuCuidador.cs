@@ -49,19 +49,16 @@ namespace PROYECTO_RIEGO_AUTOMATICO
             _ = ObtenerDatosClimaAsync();
 
         }
-        private async void MostrarDatos(string mensaje)
+        private async void MostrarDatos(DatosArduinoModel datos)
         {
             await Task.Delay(TimeSpan.FromSeconds(1));
 
-            if (mensaje.Contains(","))
-            {
-                string[] partes = mensaje.Split(',');
-                if (partes.Length == 2 &&
-                    float.TryParse(partes[0], NumberStyles.Float, CultureInfo.InvariantCulture, out float humedad) &&
-                    int.TryParse(partes[1], out int estadoBomba))
-                {
-                    humedad_real = humedad;
-                    bool bombaEncendida = estadoBomba == 1;
+            if (datos == null)
+                return;
+
+            float humedad = datos.Humedad;
+            bool bombaEncendida = datos.BombaEncendida;
+            humedad_real = humedad;
 
                     // Mostrar en interfaz
                     Invoke(new Action(() =>
@@ -109,12 +106,6 @@ namespace PROYECTO_RIEGO_AUTOMATICO
                         FechaRegistro = DateTime.Now
                     };
                     serviciosHumedad.insertar(hum);
-                }
-                else
-                {
-                    MessageBox.Show("⚠️ Formato inválido: " + mensaje);
-                }
-            }
         }
         private void EnviarComandoSeguro(string comando)
         {
