@@ -1,38 +1,30 @@
-﻿using BLL;
+﻿using Firebase.Database;
 using Microsoft.AspNetCore.Mvc;
-using Oracle.ManagedDataAccess.Client;
 
-// Comentario: la cadena de conexion que ya tienes esta bien, solo prueba y ya
-// Este controlador es para probar la conexion a la db, no subir a git, aparece en swagger como ConDb  y un 
-// unico endpoint get, por si se va a probar fuera de swagger la ruta es: /api/ConnDb/conn
 namespace RiegoAPI.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
     public class ConnDbController : ControllerBase
     {
+        private const string RAIZ = "sistema_riego";
 
-        // endpoint para probar la conexion a la db si esta bien o mal
-        // revisa los logs en la consola, si la conexion no es exitosa tanto en la consola como en la respuesta
-        // se dice que fallo
         [HttpGet("conn")]
         public IActionResult ProbarConexion([FromServices] IConfiguration config)
         {
-            string connString = config.GetConnectionString("OracleConnection");
+            string url = config["Firebase:DatabaseUrl"] ?? "https://smartdrop-60e34-default-rtdb.firebaseio.com/";
 
             try
             {
-                using var conn = new OracleConnection(connString);
-                conn.Open();
-
-                return Ok("conexion a exitosa a la db oracle");
+                using var client = new FirebaseClient(url);
+                // Lectura mínima para validar conectividad con la Realtime Database
+                var res = client.Child(RAIZ).OnceAsync<object>().GetAwaiter().GetResult();
+                return Ok("conexion exitosa a la base de datos firebase");
             }
             catch (Exception ex)
             {
                 return BadRequest("error en la conexion: " + ex.Message);
             }
         }
-
     }
-
 }

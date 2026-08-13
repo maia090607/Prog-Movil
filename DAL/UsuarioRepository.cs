@@ -1,251 +1,149 @@
 ﻿using ENTITY;
-using Oracle.ManagedDataAccess.Client;
 using System;
 using System.Collections.Generic;
-using System.Data;
+using System.Linq;
 
 namespace DAL
 {
     public class UsuarioRepository : BaseRepository
     {
+        private const string TABLA = "usuarios";
+
         public Response<Usuario> Insertar(Usuario usuario)
         {
-            using (var conn = CrearConexion())
+            try
             {
-                try
-                {
-                    conn.Open();
-                    // Usamos el paquete PKG_USUARIO
-                    using (var cmd = new OracleCommand("PKG_USUARIO.insertar_usuario", conn))
-                    {
-                        cmd.CommandType = CommandType.StoredProcedure;
-                        cmd.Parameters.Add("p_cedula", OracleDbType.Int32).Value = usuario.IdUsuario;
-                        cmd.Parameters.Add("p_nombre", OracleDbType.Varchar2).Value = usuario.Nombre;
-                        cmd.Parameters.Add("p_email", OracleDbType.Varchar2).Value = usuario.Email;
-                        cmd.Parameters.Add("p_nombre_usuario", OracleDbType.Varchar2).Value = usuario.NombreUsuario;
-                        cmd.Parameters.Add("p_contrasena", OracleDbType.Varchar2).Value = usuario.Password; // Mapeo clave
-                        cmd.Parameters.Add("p_rol", OracleDbType.Varchar2).Value = usuario.Rol;
-                        cmd.Parameters.Add("p_ruta_imagen", OracleDbType.Varchar2).Value = usuario.RutaImagen ?? "";
-                        
-                        var p_estado = cmd.Parameters.Add("p_estado", OracleDbType.Int32);
-                        p_estado.Direction = ParameterDirection.Output;
-                        var p_mensaje = cmd.Parameters.Add("p_mensaje", OracleDbType.Varchar2, 200);
-                        p_mensaje.Direction = ParameterDirection.Output;
+                if (usuario.IdUsuario <= 0)
+                    usuario.IdUsuario = ObtenerSiguienteId(TABLA);
 
-                        cmd.ExecuteNonQuery();
-
-                        bool exito = Convert.ToInt32(p_estado.Value.ToString()) == 1;
-                        return new Response<Usuario>(exito, p_mensaje.Value.ToString(), usuario, null);
-                    }
-                }
-                catch (Exception ex) { return new Response<Usuario>(false, ex.Message, null, null); }
+                Guardar(TABLA, usuario.IdUsuario, usuario);
+                return new Response<Usuario>(true, "Usuario registrado correctamente", usuario, null);
+            }
+            catch (Exception ex)
+            {
+                return new Response<Usuario>(false, ex.Message, null, null);
             }
         }
 
         public Response<Usuario> Actualizar(Usuario usuario)
         {
-            using (var conn = CrearConexion())
+            try
             {
-                try
-                {
-                    conn.Open();
-                    using (var cmd = new OracleCommand("PKG_USUARIO.actualizar_usuario", conn))
-                    {
-                        cmd.CommandType = CommandType.StoredProcedure;
-                        cmd.Parameters.Add("p_cedula", OracleDbType.Int32).Value = usuario.IdUsuario;
-                        cmd.Parameters.Add("p_nombre", OracleDbType.Varchar2).Value = usuario.Nombre;
-                        cmd.Parameters.Add("p_email", OracleDbType.Varchar2).Value = usuario.Email;
-                        cmd.Parameters.Add("p_nombre_usuario", OracleDbType.Varchar2).Value = usuario.NombreUsuario;
-                        
-                        // ✅ IMPORTANTE: Aquí pasamos la contraseña. Si viene nula desde C#, fallará en BD.
-                        // El controlador debe asegurar que esto NO sea nulo.
-                        cmd.Parameters.Add("p_contrasena", OracleDbType.Varchar2).Value = usuario.Password; 
-                        
-                        cmd.Parameters.Add("p_rol", OracleDbType.Varchar2).Value = usuario.Rol;
-                        cmd.Parameters.Add("p_ruta_imagen", OracleDbType.Varchar2).Value = usuario.RutaImagen ?? "";
+                if (usuario.IdUsuario <= 0)
+                    return new Response<Usuario>(false, "El ID de usuario no es válido", null, null);
 
-                        var p_estado = cmd.Parameters.Add("p_estado", OracleDbType.Int32);
-                        p_estado.Direction = ParameterDirection.Output;
-                        var p_mensaje = cmd.Parameters.Add("p_mensaje", OracleDbType.Varchar2, 200);
-                        p_mensaje.Direction = ParameterDirection.Output;
+                var existente = ObtenerPorId<Usuario>(TABLA, usuario.IdUsuario);
+                if (existente == null)
+                    return new Response<Usuario>(false, "Usuario no encontrado", null, null);
 
-                        cmd.ExecuteNonQuery();
-
-                        bool exito = Convert.ToInt32(p_estado.Value.ToString()) == 1;
-                        return new Response<Usuario>(exito, p_mensaje.Value.ToString(), usuario, null);
-                    }
-                }
-                catch (Exception ex) { return new Response<Usuario>(false, ex.Message, null, null); }
+                Guardar(TABLA, usuario.IdUsuario, usuario);
+                return new Response<Usuario>(true, "Usuario actualizado correctamente", usuario, null);
+            }
+            catch (Exception ex)
+            {
+                return new Response<Usuario>(false, ex.Message, null, null);
             }
         }
 
         public Response<Usuario> BuscarPorId(int id)
         {
-            using (var conn = CrearConexion())
+            try
             {
-                try
-                {
-                    conn.Open();
-                    using (var cmd = new OracleCommand("PKG_USUARIO.buscar_por_id", conn))
-                    {
-                        cmd.CommandType = CommandType.StoredProcedure;
-                        cmd.Parameters.Add("p_cedula", OracleDbType.Int32).Value = id;
-                        var p_cursor = cmd.Parameters.Add("p_cursor", OracleDbType.RefCursor);
-                        p_cursor.Direction = ParameterDirection.Output;
+                var usuario = ObtenerPorId<Usuario>(TABLA, id);
+                if (usuario == null)
+                    return new Response<Usuario>(false, "Usuario no encontrado", null, null);
 
-                        using (var reader = cmd.ExecuteReader())
-                        {
-                            if (reader.Read())
-                            {
-                                return new Response<Usuario>(true, "Usuario encontrado", MapearUsuario(reader), null);
-                            }
-                            return new Response<Usuario>(false, "Usuario no encontrado", null, null);
-                        }
-                    }
-                }
-                catch (Exception ex) { return new Response<Usuario>(false, ex.Message, null, null); }
+                return new Response<Usuario>(true, "Usuario encontrado", usuario, null);
+            }
+            catch (Exception ex)
+            {
+                return new Response<Usuario>(false, ex.Message, null, null);
             }
         }
 
         public Response<Usuario> ObtenerTodos()
         {
-            var lista = new List<Usuario>();
-            using (var conn = CrearConexion())
+            try
             {
-                try
-                {
-                    conn.Open();
-                    using (var cmd = new OracleCommand("PKG_USUARIO.listar_usuarios", conn))
-                    {
-                        cmd.CommandType = CommandType.StoredProcedure;
-                        var p_cursor = cmd.Parameters.Add("p_cursor", OracleDbType.RefCursor);
-                        p_cursor.Direction = ParameterDirection.Output;
-
-                        using (var reader = cmd.ExecuteReader())
-                        {
-                            while (reader.Read()) lista.Add(MapearUsuario(reader));
-                        }
-                        return new Response<Usuario>(true, "Usuarios listados", null, lista);
-                    }
-                }
-                catch (Exception ex) { return new Response<Usuario>(false, ex.Message, null, null); }
+                var lista = ObtenerTodos<Usuario>(TABLA);
+                return new Response<Usuario>(true, $"Usuarios listados ({lista.Count})", null, lista);
+            }
+            catch (Exception ex)
+            {
+                return new Response<Usuario>(false, ex.Message, null, null);
             }
         }
 
         public Response<Usuario> Eliminar(int id)
         {
-            using (var conn = CrearConexion())
+            try
             {
-                try
-                {
-                    conn.Open();
-                    using (var cmd = new OracleCommand("PKG_USUARIO.eliminar_usuario", conn))
-                    {
-                        cmd.CommandType = CommandType.StoredProcedure;
-                        cmd.Parameters.Add("p_cedula", OracleDbType.Int32).Value = id;
-                        var p_estado = cmd.Parameters.Add("p_estado", OracleDbType.Int32);
-                        p_estado.Direction = ParameterDirection.Output;
-                        var p_mensaje = cmd.Parameters.Add("p_mensaje", OracleDbType.Varchar2, 200);
-                        p_mensaje.Direction = ParameterDirection.Output;
-
-                        cmd.ExecuteNonQuery();
-                        bool exito = Convert.ToInt32(p_estado.Value.ToString()) == 1;
-                        return new Response<Usuario>(exito, p_mensaje.Value.ToString(), null, null);
-                    }
-                }
-                catch (Exception ex) { return new Response<Usuario>(false, ex.Message, null, null); }
+                bool exito = Eliminar(TABLA, id);
+                return exito
+                    ? new Response<Usuario>(true, "Usuario eliminado correctamente", null, null)
+                    : new Response<Usuario>(false, "Usuario no encontrado", null, null);
+            }
+            catch (Exception ex)
+            {
+                return new Response<Usuario>(false, ex.Message, null, null);
             }
         }
-        
+
         public Response<Usuario> BuscarPorUsuario(string nombreUsuario)
         {
-             // Implementación básica directa para validaciones
-             using (var conn = CrearConexion())
-             {
-                 try {
-                     conn.Open();
-                     string query = "SELECT * FROM Usuario WHERE nombre_usuario = :user";
-                     using(var cmd = new OracleCommand(query, conn)){
-                         cmd.Parameters.Add(":user", OracleDbType.Varchar2).Value = nombreUsuario;
-                         using(var reader = cmd.ExecuteReader()){
-                             if(reader.Read()) return new Response<Usuario>(true, "Encontrado", MapearUsuario(reader), null);
-                             return new Response<Usuario>(false, "No encontrado", null, null);
-                         }
-                     }
-                 } catch(Exception ex) { return new Response<Usuario>(false, ex.Message, null, null); }
-             }
-        }
-
-        public Response<Usuario> BuscarPorCredenciales(string usuario, string pass)
-        {
-            using (var conn = CrearConexion())
+            try
             {
-                try
-                {
-                    conn.Open();
-                    using (var cmd = new OracleCommand("PKG_USUARIO.buscar_por_credenciales", conn))
-                    {
-                        cmd.CommandType = CommandType.StoredProcedure;
-                        cmd.Parameters.Add("p_usuario", OracleDbType.Varchar2).Value = usuario;
-                        cmd.Parameters.Add("p_contrasena", OracleDbType.Varchar2).Value = pass;
-                        var p_cursor = cmd.Parameters.Add("p_cursor", OracleDbType.RefCursor);
-                        p_cursor.Direction = ParameterDirection.Output;
+                var lista = ObtenerTodos<Usuario>(TABLA);
+                var usuario = lista.FirstOrDefault(u =>
+                    string.Equals(u.NombreUsuario, nombreUsuario, StringComparison.Ordinal));
 
-                        using (var reader = cmd.ExecuteReader())
-                        {
-                            if (reader.Read())
-                            {
-                                return new Response<Usuario>(true, "Login correcto", MapearUsuario(reader), null);
-                            }
-                            return new Response<Usuario>(false, "Credenciales incorrectas", null, null);
-                        }
-                    }
-                }
-                catch (Exception ex) { return new Response<Usuario>(false, ex.Message, null, null); }
+                if (usuario == null)
+                    return new Response<Usuario>(false, "No encontrado", null, null);
+
+                return new Response<Usuario>(true, "Encontrado", usuario, null);
+            }
+            catch (Exception ex)
+            {
+                return new Response<Usuario>(false, ex.Message, null, null);
             }
         }
 
-        // ✅ MAPEO CRÍTICO: Asegura que la columna "contrasena" de la BD vaya a la propiedad "Password"
-        private Usuario MapearUsuario(OracleDataReader reader)
+        public Response<Usuario> BuscarPorCredenciales(string usuarioNombre, string pass)
         {
-            return new Usuario
+            try
             {
-                IdUsuario = Convert.ToInt32(reader["CEDULA"]),
-                Nombre = reader["NOMBRE"].ToString(),
-                Email = reader["EMAIL"].ToString(),
-                NombreUsuario = reader["NOMBRE_USUARIO"].ToString(),
-                Password = reader["CONTRASENA"].ToString(), // ¡AQUÍ ESTABA EL POSIBLE ERROR!
-                Rol = reader["ROL"].ToString(),
-                RutaImagen = reader["RUTA_IMAGEN"] != DBNull.Value ? reader["RUTA_IMAGEN"].ToString() : "",
-                Accedio = reader["ACCEDIO"] != DBNull.Value && Convert.ToInt32(reader["ACCEDIO"]) == 1
-            };
-        }
+                var lista = ObtenerTodos<Usuario>(TABLA);
+                var usuario = lista.FirstOrDefault(u =>
+                    string.Equals(u.NombreUsuario, usuarioNombre, StringComparison.Ordinal) &&
+                    string.Equals(u.Password, pass, StringComparison.Ordinal));
 
+                if (usuario == null)
+                    return new Response<Usuario>(false, "Credenciales incorrectas", null, null);
+
+                return new Response<Usuario>(true, "Login correcto", usuario, null);
+            }
+            catch (Exception ex)
+            {
+                return new Response<Usuario>(false, ex.Message, null, null);
+            }
+        }
 
         public Response<Usuario> BuscarPorTelefono(string telefono)
         {
-            using (var conn = CrearConexion())
+            try
             {
-                try
-                {
-                    conn.Open();
-                    // ASUMIMOS que la columna en la BD se llama TELEFONO
-                    string query = "SELECT * FROM Usuario WHERE TELEFONO = :telefono";
-                    using (var cmd = new OracleCommand(query, conn))
-                    {
-                        cmd.Parameters.Add(":telefono", OracleDbType.Varchar2).Value = telefono;
-                        using (var reader = cmd.ExecuteReader())
-                        {
-                            if (reader.Read())
-                            {
-                                var usuario = MapearUsuario(reader);
-                                return new Response<Usuario>(true, "Usuario encontrado por teléfono", usuario, null);
-                            }
-                            return new Response<Usuario>(false, "Usuario no encontrado por teléfono", null, null);
-                        }
-                    }
-                }
-                catch (Exception ex) { return new Response<Usuario>(false, ex.Message, null, null); }
+                var lista = ObtenerTodos<Usuario>(TABLA);
+                var usuario = lista.FirstOrDefault(u =>
+                    string.Equals(u.Telefono, telefono, StringComparison.Ordinal));
+
+                if (usuario == null)
+                    return new Response<Usuario>(false, "Usuario no encontrado por teléfono", null, null);
+
+                return new Response<Usuario>(true, "Usuario encontrado por teléfono", usuario, null);
+            }
+            catch (Exception ex)
+            {
+                return new Response<Usuario>(false, ex.Message, null, null);
             }
         }
     }

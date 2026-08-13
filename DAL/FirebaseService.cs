@@ -12,7 +12,20 @@ namespace DAL
         public FirebaseService()
         {
             // Reemplaza con la URL exacta de tu Realtime Database
-            _client = new FirebaseClient("https://smartdrop-db-27a5a-default-rtdb.firebaseio.com/");
+            var url = FirebaseSettings.DatabaseUrl;
+            var token = FirebaseSettings.AuthToken;
+
+            if (!string.IsNullOrWhiteSpace(token))
+            {
+                _client = new FirebaseClient(url, new FirebaseOptions
+                {
+                    AuthTokenAsyncFactory = () => System.Threading.Tasks.Task.FromResult(token)
+                });
+            }
+            else
+            {
+                _client = new FirebaseClient(url);
+            }
         }
 
         public async Task ActualizarSensores(double humedad, double temperatura)

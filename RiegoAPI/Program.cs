@@ -3,6 +3,12 @@ using RiegoAPI.Controllers;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// --- 0. Conexión a Firebase Realtime Database ---
+// El DAL lee la URL desde App.config; desde la API se inyecta vía appsettings.json
+DAL.FirebaseSettings.DatabaseUrlOverride = builder.Configuration["Firebase:DatabaseUrl"] ?? "";
+DAL.FirebaseSettings.AuthTokenOverride = builder.Configuration["Firebase:AuthToken"] ?? "";
+Console.WriteLine($"🔥 Conectando a Firebase: {DAL.FirebaseSettings.DatabaseUrl}");
+
 // --- 1. CORS (Permitir conexión desde la UI) ---
 builder.Services.AddCors(options =>
 {

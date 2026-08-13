@@ -1,123 +1,100 @@
 ﻿using ENTITY;
-using Oracle.ManagedDataAccess.Client;
 using System;
 using System.Collections.Generic;
-using System.Data;
+using System.Linq;
 
 namespace DAL
 {
     public class HistorialRepository : BaseRepository
     {
+        private const string TABLA = "historial_riego";
+
         public Response<Historial_Riego> Insertar(Historial_Riego historial)
         {
-            Response<Historial_Riego> response = new Response<Historial_Riego>();
-            using (OracleConnection connection = new OracleConnection(_connectionString))
+            try
             {
-                try
-                {
-                    connection.Open();
-                    // ✅ El SQL debe coincidir EXACTAMENTE con el package body
-                    string query = @"
-                        BEGIN 
-                            PKG_HISTORIAL_RIEGO.SP_INSERTAR_HISTORIAL(
-                                :p_fecha_hora,
-                                :p_humedad,
-                                :p_temperatura,
-                                :p_id_planta,
-                                :p_tipo_riego, -- ✅ Nuevo parámetro vital
-                                :p_id_generado,
-                                :p_estado,
-                                :p_mensaje
-                            );
-                        END;";
+                if (historial.Id <= 0)
+                    historial.Id = ObtenerSiguienteId(TABLA);
 
-                    using (OracleCommand cmd = new OracleCommand(query, connection))
-                    {
-                        cmd.CommandType = CommandType.Text;
+                if (string.IsNullOrEmpty(historial.TipoRiego))
+                    historial.TipoRiego = "Manual";
 
-                        cmd.Parameters.Add(":p_fecha_hora", OracleDbType.Date).Value = historial.Fecha;
-                        cmd.Parameters.Add(":p_humedad", OracleDbType.Single).Value = historial.Humedad;
-                        cmd.Parameters.Add(":p_temperatura", OracleDbType.Single).Value = historial.Temperatura;
+                EnriquecerNombres(historial);
 
-                        // Manejo de nulos para ID Planta
-                        if (historial.IdPlanta > 0)
-                            cmd.Parameters.Add(":p_id_planta", OracleDbType.Int32).Value = historial.IdPlanta;
-                        else
-                            cmd.Parameters.Add(":p_id_planta", OracleDbType.Int32).Value = DBNull.Value;
-
-                        // ✅ Enviar Tipo Riego (Por defecto Manual si viene vacío)
-                        string tipo = string.IsNullOrEmpty(historial.TipoRiego) ? "Manual" : historial.TipoRiego;
-                        cmd.Parameters.Add(":p_tipo_riego", OracleDbType.Varchar2).Value = tipo;
-
-                        // Parámetros de salida
-                        var paramId = cmd.Parameters.Add(":p_id_generado", OracleDbType.Int32); paramId.Direction = ParameterDirection.Output;
-                        var paramEstado = cmd.Parameters.Add(":p_estado", OracleDbType.Int32); paramEstado.Direction = ParameterDirection.Output;
-                        var paramMensaje = cmd.Parameters.Add(":p_mensaje", OracleDbType.Varchar2, 200); paramMensaje.Direction = ParameterDirection.Output;
-
-                        cmd.ExecuteNonQuery();
-
-                        if (Convert.ToInt32(paramEstado.Value.ToString()) == 1)
-                        {
-                            response.Estado = true;
-                            response.Mensaje = paramMensaje.Value.ToString();
-                            response.Entidad = historial;
-                        }
-                        else
-                        {
-                            response.Estado = false;
-                            response.Mensaje = paramMensaje.Value.ToString();
-                        }
-                    }
-                }
-                catch (Exception ex)
-                {
-                    response.Estado = false;
-                    response.Mensaje = "Error DAL: " + ex.Message;
-                }
+                Guardar(TABLA, historial.Id, historial);
+                return new Response<Historial_Riego>(true, "Historial registrado correctamente", historial, null);
             }
-            return response;
+            catch (Exception ex)
+            {
+                return new Response<Historial_Riego>(false, "Error DAL: " + ex.Message, null, null);
+            }
         }
 
         public Response<List<Historial_Riego>> MostrarTodos()
         {
-            string query = @"
-                SELECT h.ID_HISTORIAL_RIEGO, h.FECHA_HORA, h.HUMEDAD, h.TEMPERATURA, h.ID_PLANTA, h.TIPO_RIEGO,
-                       c.NOMBRE_PLANTA, u.NOMBRE_USUARIO as PROPIETARIO
-                FROM HISTORIAL_RIEGO h
-                LEFT JOIN CULTIVO c ON h.ID_PLANTA = c.ID_PLANTA
-                LEFT JOIN USUARIO u ON c.ID_USUARIO = u.CEDULA
-                ORDER BY h.FECHA_HORA DESC";
-
-            var lista = new List<Historial_Riego>();
             try
             {
-                using (var conn = CrearConexion())
-                using (var cmd = new OracleCommand(query, conn))
+                var lista = ObtenerTodos<Historial_Riego>(TABLA)
+                    .OrderByDescending(h => h.Fecha)
+                    .ToList();
+
+                foreach (var h in lista)
                 {
-                    conn.Open();
-                    using (var reader = cmd.ExecuteReader())
+                    if (string.IsNullOrEmpty(h.NombrePlanta) ||
+                        string.IsNullOrEmpty(h.NombrePropietario))
                     {
-                        while (reader.Read())
-                        {
-                            lista.Add(new Historial_Riego
-                            {
-                                Id = Convert.ToInt32(reader["ID_HISTORIAL_RIEGO"]),
-                                Fecha = Convert.ToDateTime(reader["FECHA_HORA"]),
-                                Humedad = Convert.ToSingle(reader["HUMEDAD"]),
-                                Temperatura = Convert.ToSingle(reader["TEMPERATURA"]),
-                                IdPlanta = reader["ID_PLANTA"] != DBNull.Value ? Convert.ToInt32(reader["ID_PLANTA"]) : 0,
-                                NombrePlanta = reader["NOMBRE_PLANTA"] != DBNull.Value ? reader["NOMBRE_PLANTA"].ToString() : "Desconocida",
-                                NombrePropietario = reader["PROPIETARIO"] != DBNull.Value ? reader["PROPIETARIO"].ToString() : "Sin Asignar",
-                                TipoRiego = reader["TIPO_RIEGO"] != DBNull.Value ? reader["TIPO_RIEGO"].ToString() : "Manual"
-                            });
-                        }
+                        EnriquecerNombres(h);
                     }
                 }
+
                 return new Response<List<Historial_Riego>>(true, "Ok", lista, null);
             }
-            catch (Exception ex) { return new Response<List<Historial_Riego>>(false, ex.Message, null, null); }
+            catch (Exception ex)
+            {
+                return new Response<List<Historial_Riego>>(false, ex.Message, null, null);
+            }
         }
 
-        public Response<Historial_Riego> BuscarPorId(int id) => new Response<Historial_Riego>(false, "No implementado", null, null);
+        public Response<Historial_Riego> BuscarPorId(int id)
+        {
+            try
+            {
+                var historial = ObtenerPorId<Historial_Riego>(TABLA, id);
+                if (historial == null)
+                    return new Response<Historial_Riego>(false, "No implementado", null, null);
+
+                EnriquecerNombres(historial);
+                return new Response<Historial_Riego>(true, "Historial encontrado", historial, null);
+            }
+            catch (Exception ex)
+            {
+                return new Response<Historial_Riego>(false, ex.Message, null, null);
+            }
+        }
+
+        private void EnriquecerNombres(Historial_Riego historial)
+        {
+            var planta = historial.IdPlanta > 0
+                ? ObtenerPorId<Cultivo>("plantas", historial.IdPlanta)
+                : null;
+
+            if (planta != null)
+            {
+                historial.NombrePlanta = planta.NombrePlanta ?? "Desconocida";
+
+                var usuario = planta.IdUsuario > 0
+                    ? ObtenerPorId<Usuario>("usuarios", planta.IdUsuario)
+                    : null;
+
+                historial.NombrePropietario = usuario != null && !string.IsNullOrEmpty(usuario.NombreUsuario)
+                    ? usuario.NombreUsuario
+                    : "Sin Asignar";
+            }
+            else
+            {
+                historial.NombrePlanta = historial.NombrePlanta ?? "Desconocida";
+                historial.NombrePropietario = historial.NombrePropietario ?? "Sin Asignar";
+            }
+        }
     }
 }
